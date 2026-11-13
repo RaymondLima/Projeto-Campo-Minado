@@ -421,11 +421,11 @@ def formatar_tempo(total):
     return "%02d:%02d" % (total // 60, total % 60)
 
 
-# Mostra a tela de fim de jogo com o resultado, o tempo e os botões.
+# Mostra a tela de fim de jogo com o resultado, o tempo, o recorde e os botões.
 def mostrar_tela_fim(venceu):
 
     limpar_janela()
-    janela.geometry("500x400")
+    janela.geometry("500x450")
 
     frame = tk.Frame(janela, bg="#2c3e50")
     frame.pack(expand=True)
@@ -449,13 +449,43 @@ def mostrar_tela_fim(venceu):
         bg="#2c3e50", fg="#ecf0f1"
     ).pack(pady=(0, 10))
 
+    # Recorde coletado na internet para o nível jogado.
+    recorde = carregar_recorde_internet(DIFICULDADE_ATUAL)
+
+    if recorde is None:
+        texto_recorde = "Recorde da internet indisponível"
+    else:
+        texto_recorde = "Recorde da internet: " + formatar_recorde(recorde)
+
+    tk.Label(
+        frame, text=texto_recorde,
+        font=("Press Start 2P", 8),
+        bg="#2c3e50", fg="#3498db"
+    ).pack(pady=(0, 10))
+
+    # Compara o tempo do jogador com o recorde, só se ele ganhou.
+    if venceu and recorde is not None:
+
+        diferenca = segundos - recorde
+
+        if diferenca <= 0:
+            texto_comparacao = "VOCÊ BATEU O RECORDE DA INTERNET!"
+        else:
+            texto_comparacao = "Faltaram %.1f s para o recorde" % diferenca
+
+        tk.Label(
+            frame, text=texto_comparacao,
+            font=("Press Start 2P", 8),
+            bg="#2c3e50", fg="#ecf0f1"
+        ).pack(pady=(0, 10))
+
     # Só guarda o tempo se o jogador ganhou.
     if venceu:
         novo_recorde = salvar_recorde(DIFICULDADE_ATUAL, segundos)
 
         if novo_recorde:
             tk.Label(
-                frame, text="NOVO RECORDE!",
+                frame, text="NOVO RECORDE SEU!",
                 font=("Press Start 2P", 10),
                 bg="#2c3e50", fg="#f1c40f"
             ).pack(pady=(0, 10))
@@ -604,6 +634,31 @@ def coletar_recordes_internet():
 
     except OSError:
         return False
+
+
+# Lê o arquivo de recordes da internet e devolve o tempo do nível (ou None).
+def carregar_recorde_internet(dificuldade):
+
+    if not os.path.exists(ARQUIVO_RECORDES_INTERNET):
+        return None
+
+    try:
+        with open(ARQUIVO_RECORDES_INTERNET, "r", encoding="utf-8") as arquivo:
+            dados = json.load(arquivo)
+
+        return float(dados.get(dificuldade))
+
+    except (json.JSONDecodeError, OSError, ValueError, TypeError, AttributeError):
+        return None
+
+
+# Converte um recorde com decimais para o formato 00:03.2.
+def formatar_recorde(valor):
+
+    minutos = int(valor // 60)
+    seg = valor % 60
+
+    return "%02d:%04.1f" % (minutos, seg)
 
 
 # Executar o jogo 
