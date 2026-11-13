@@ -3,6 +3,9 @@ import tkinter as tk
 import random
 import json
 import os
+import threading
+import requests
+from bs4 import BeautifulSoup
 
 # Configurações 
 
@@ -33,6 +36,14 @@ MINAS = DIFICULDADES["facil"]["minas"]
 DIFICULDADE_ATUAL = "facil"
 
 ARQUIVO_RECORDES = "recordes.json"
+
+ARQUIVO_RECORDES_INTERNET = "recordes_internet.json"
+
+PAGINAS_RECORDES = {
+    "facil": "https://minesweeper.now/ranking/beginner",
+    "medio": "https://minesweeper.now/ranking/intermediate",
+    "dificil": "https://minesweeper.now/ranking/expert"
+}
 
 tabela_minas = []
 tabela_numeros = []
@@ -530,6 +541,70 @@ def salvar_recorde(dificuldade, tempo):
 
     return False
 
+# Baixa a página de um nível e devolve o melhor tempo em segundos (ou None se falhar).
+def buscar_melhor_tempo(url):
+
+    try:
+        resposta = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (trabalho da faculdade)"},
+            timeout=5
+        )
+        resposta.raise_for_status()
+
+    except requests.RequestException:
+        return None
+
+    sopa = BeautifulSoup(resposta.text, "html.parser")
+
+    tempos = []
+
+    # A primeira linha é o cabeçalho, por isso começa na segunda.
+    for linha in sopa.find_all("tr")[1:]:
+
+        celulas = linha.find_all("td")
+
+        if len(celulas) < 3:
+            continue
+
+        # A terceira coluna é o tempo, por exemplo "3.171s".
+        texto = celulas[2].get_text(strip=True)
+
+        try:
+            tempos.append(float(texto.replace("s", "")))
+        except ValueError:
+            pass
+
+    if not tempos:
+        return None
+
+    return min(tempos)
+
+
+# Coleta o melhor tempo dos três níveis e salva no arquivo de recordes da internet.
+def coletar_recordes_internet():
+
+    recordes = {}
+
+    for nivel, url in PAGINAS_RECORDES.items():
+
+        tempo = buscar_melhor_tempo(url)
+
+        # Se um nível falhar, mantém o arquivo antigo e não trava o jogo.
+        if tempo is None:
+            return False
+
+        recordes[nivel] = tempo
+
+    try:
+        with open(ARQUIVO_RECORDES_INTERNET, "w", encoding="utf-8") as arquivo:
+            json.dump(recordes, arquivo, indent=4, ensure_ascii=False)
+
+        return True
+
+    except OSError:
+        return False
+
 
 # Executar o jogo 
 
@@ -610,6 +685,9 @@ def iniciar_partida():
     janela.geometry("")  # deixa a janela se ajustar ao tamanho do tabuleiro
     criar_tabuleiro()
     criar_tela_jogo()
+
+# Coleta os recordes em segundo plano para a janela não congelar.
+threading.Thread(target=coletar_recordes_internet, daemon=True).start()
 
 mostrar_menu()
 
