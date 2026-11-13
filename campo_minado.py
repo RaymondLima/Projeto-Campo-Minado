@@ -29,6 +29,28 @@ DIFICULDADES = {
     }
 }
 
+# Cores e fonte do tabuleiro.
+FONTE_CASA = ("Consolas", 10, "bold")
+
+COR_FECHADA = "#566573"
+COR_FECHADA_CLIQUE = "#85929e"
+COR_ABERTA = "#ecf0f1"
+COR_MINA_CLICADA = "#e74c3c"
+COR_MINA_OUTRAS = "#922b21"
+COR_BANDEIRA = "#f1c40f"
+
+# Uma cor para cada número de minas vizinhas.
+CORES_NUMEROS = {
+    1: "#2980b9",
+    2: "#27ae60",
+    3: "#e74c3c",
+    4: "#8e44ad",
+    5: "#a04000",
+    6: "#16a085",
+    7: "#2c3e50",
+    8: "#7f8c8d"
+}
+
 LINHAS = DIFICULDADES["facil"]["linhas"]
 COLUNAS = DIFICULDADES["facil"]["colunas"]
 MINAS = DIFICULDADES["facil"]["minas"]
@@ -173,13 +195,17 @@ def criar_tela_jogo():
                 width=3,
                 height=1,
                 text="",
-                bg="#d9d9d9",
+                font=FONTE_CASA,
+                bg=COR_FECHADA,
+                activebackground=COR_FECHADA_CLIQUE,
+                relief=tk.RAISED,
+                bd=2,
                 command=lambda l=linha, c=coluna: abrir_casa(l, c)
             )
 
-            botao.grid(row=linha, column=coluna)
+            botao.grid(row=linha, column=coluna, padx=1, pady=1)
 
-             # Clique direito coloca ou tira a bandeira.
+            # Clique direito coloca ou tira a bandeira.
             botao.bind(
                 "<Button-3>",
                 lambda evento, l=linha, c=coluna: alternar_bandeira(l, c)
@@ -214,6 +240,39 @@ def criar_tela_jogo():
     mostrar_tempo()
 
 
+# Desenha uma casa aberta: fundo claro e número colorido.
+def desenhar_casa_aberta(linha, coluna):
+
+    quantidade = tabela_numeros[linha][coluna]
+
+    texto = str(quantidade) if quantidade > 0 else ""
+
+    botoes[linha][coluna].config(
+        text=texto,
+        relief=tk.SUNKEN,
+        state="disabled",
+        bg=COR_ABERTA,
+        disabledforeground=CORES_NUMEROS.get(quantidade, COR_ABERTA)
+    )
+
+
+# Desenha uma mina, destacando a que o jogador clicou.
+def desenhar_mina(linha, coluna, clicada):
+
+    if clicada:
+        cor = COR_MINA_CLICADA
+    else:
+        cor = COR_MINA_OUTRAS
+
+    botoes[linha][coluna].config(
+        text="💣",
+        relief=tk.SUNKEN,
+        state="disabled",
+        bg=cor,
+        disabledforeground="#ffffff"
+    )
+
+
 # Abrir uma casa 
 
 # Abre a casa clicada e mostra se há uma mina ou um número.
@@ -228,7 +287,7 @@ def abrir_casa(linha, coluna):
     if tabela_estado[linha][coluna] in ("aberta", "bandeira"):
         return
 
-    # Sorteia as minas somente no primeiro clique.
+    # Sorteia as minas e inicia o cronômetro somente no primeiro clique.
     if not minas_sorteadas:
         sortear_minas(linha, coluna)
         iniciar_cronometro()
@@ -238,32 +297,18 @@ def abrir_casa(linha, coluna):
     # Verifica se a casa possui uma mina.
     if tabela_minas[linha][coluna]:
 
-        botoes[linha][coluna].config(
-            text="💣",
-            bg="red",
-            state="disabled"
-        )
+        desenhar_mina(linha, coluna, True)
 
         verificar_fim_de_jogo(linha, coluna)
 
         return
 
-    # Mostra o número de minas vizinhas.
-    quantidade = tabela_numeros[linha][coluna]
-
-    texto = str(quantidade) if quantidade > 0 else ""
-
-    botoes[linha][coluna].config(
-        text=texto,
-        relief=tk.SUNKEN,
-        state="disabled",
-        bg="lightgray"
-    )
+    desenhar_casa_aberta(linha, coluna)
 
     casas_abertas += 1
 
     # Se a casa é vazia, abre as vizinhas sozinha.
-    if quantidade == 0:
+    if tabela_numeros[linha][coluna] == 0:
         abrir_vizinhas(linha, coluna)
 
     verificar_fim_de_jogo(linha, coluna)
@@ -293,19 +338,10 @@ def abrir_vizinhas(linha, coluna):
             tabela_estado[nova_linha][nova_coluna] = "aberta"
             casas_abertas += 1
 
-            quantidade = tabela_numeros[nova_linha][nova_coluna]
-
-            texto = str(quantidade) if quantidade > 0 else ""
-
-            botoes[nova_linha][nova_coluna].config(
-                text=texto,
-                relief=tk.SUNKEN,
-                state="disabled",
-                bg="lightgray"
-            )
+            desenhar_casa_aberta(nova_linha, nova_coluna)
 
             # Só continua a onda se a vizinha também for vazia.
-            if quantidade == 0:
+            if tabela_numeros[nova_linha][nova_coluna] == 0:
                 abrir_vizinhas(nova_linha, nova_coluna)
 
 # Atualiza o texto que mostra quantas minas ainda faltam marcar.
@@ -370,7 +406,7 @@ def alternar_bandeira(linha, coluna):
 
     if estado == "fechada":
         tabela_estado[linha][coluna] = "bandeira"
-        botoes[linha][coluna].config(text="🚩")
+        botoes[linha][coluna].config(text="🚩", fg=COR_BANDEIRA)
         bandeiras_colocadas += 1
 
     elif estado == "bandeira":
@@ -399,11 +435,7 @@ def verificar_fim_de_jogo(linha, coluna):
             for c in range(COLUNAS):
 
                 if tabela_minas[l][c]:
-                    botoes[l][c].config(
-                        text="💣",
-                        bg="red",
-                        state="disabled"
-                    )
+                    desenhar_mina(l, c, (l, c) == (linha, coluna))
 
         # Espera um pouco para o jogador ver as minas e abre a tela de fim.
         janela.after(1200, lambda: mostrar_tela_fim(False))
